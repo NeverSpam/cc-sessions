@@ -117,7 +117,7 @@ function parseFrontmatter(content) {
             let value = line.substring(colonIndex + 1).trim();
 
             // Handle special cases
-            if (key === 'submodules' || key === 'dependencies') {
+            if (key === 'submodules' || key === 'dependencies' || key === 'repos') {
                 // Parse arrays formatted as: [item1, item2]
                 if (value.startsWith('[') && value.endsWith(']')) {
                     value = value.slice(1, -1)
@@ -453,6 +453,7 @@ To restore the previous task later:
 
     // Load conditional chunks
     let submoduleManagement = "";
+    let serviceManagement = "";
     let resumeNotes;
 
     if (config.git_preferences.has_submodules) {
@@ -461,18 +462,32 @@ To restore the previous task later:
             submoduleManagement = submoduleManagementRaw.replace(/\{default_branch\}/g, config.git_preferences.default_branch);
         }
         resumeNotes = loadProtocolFile('task-startup/resume-notes-superrepo.md');
+    } else if (config.git_preferences.has_services) {
+        const serviceManagementRaw = loadProtocolFile('task-startup/service-management.md');
+        if (serviceManagementRaw) {
+            serviceManagement = serviceManagementRaw
+                .replace(/\{default_branch\}/g, config.git_preferences.default_branch)
+                .replace(/\{services_root\}/g, config.git_preferences.services_root || '..');
+        }
+        resumeNotes = loadProtocolFile('task-startup/resume-notes-services.md') ||
+                      loadProtocolFile('task-startup/resume-notes-standard.md');
     } else {
         submoduleManagement = "";
         resumeNotes = loadProtocolFile('task-startup/resume-notes-standard.md');
     }
 
     // Set todos based on config
-    const todoBranchContent = config.git_preferences.has_submodules
-        ? 'Create/checkout task branch and matching submodule branches'
-        : 'Create/checkout task branch';
-    const todoBranchActive = config.git_preferences.has_submodules
-        ? 'Creating/checking out task branches'
-        : 'Creating/checking out task branch';
+    let todoBranchContent, todoBranchActive;
+    if (config.git_preferences.has_submodules) {
+        todoBranchContent = 'Create/checkout task branch and matching submodule branches';
+        todoBranchActive = 'Creating/checking out task branches';
+    } else if (config.git_preferences.has_services) {
+        todoBranchContent = 'Create/checkout task branch in all affected service repos';
+        todoBranchActive = 'Creating/checking out task branches in service repos';
+    } else {
+        todoBranchContent = 'Create/checkout task branch';
+        todoBranchActive = 'Creating/checking out task branch';
+    }
 
     const todos = [
         { content: todoBranchContent, status: "pending", activeForm: todoBranchActive },
@@ -482,9 +497,12 @@ To restore the previous task later:
 
     // Format protocol with template substitutions
     if (protocolContent) {
+        // Combine submodule and service management into one section
+        const repoManagement = submoduleManagement || serviceManagement || '';
         protocolContent = protocolContent
             .replace(/\{task_reference\}/g, taskName)
-            .replace(/\{submodule_management\}/g, submoduleManagement || '')
+            .replace(/\{submodule_management\}/g, repoManagement)
+            .replace(/\{service_management\}/g, serviceManagement || '')
             .replace(/\{resume_notes\}/g, resumeNotes || '')
             .replace(/\{todo_branch\}/g, todos[0].content)
             .replace(/\{todo_branch_active\}/g, todos[0].activeForm);
@@ -501,7 +519,8 @@ To restore the previous task later:
             started: frontmatter.started,
             updated: frontmatter.updated,
             dependencies: frontmatter.dependencies,
-            submodules: frontmatter.submodules
+            submodules: frontmatter.submodules,
+            repos: frontmatter.repos
         });
         s.current_task = taskState;
         s.active_protocol = SessionsProtocol.START;

@@ -485,7 +485,7 @@ if (["Write", "Edit", "MultiEdit", "NotebookEdit"].includes(toolName) &&
 }
 //!<
 
-//!> Git branch/task submodules enforcement
+//!> Git branch/task submodules/repos enforcement
 const expectedBranch = STATE.current_task?.branch;
 if (!expectedBranch) {
     process.exit(0); // No branch/task info, allow to proceed
@@ -507,37 +507,45 @@ if (repoPath) {
         });
         const currentBranch = result.trim();
 
-        // Extract the submodule name from the repo path
-        const submoduleName = path.basename(repoPath);
+        // Extract the repo/submodule name from the repo path
+        const repoName = path.basename(repoPath);
 
         // Check both conditions: branch status and task inclusion
         const branchCorrect = (currentBranch === expectedBranch);
-        const inTask = (STATE.current_task.submodules && STATE.current_task.submodules.includes(submoduleName)) ||
-                       (repoPath === PROJECT_ROOT); // Root repo - always considered in task
+
+        // Check if repo is in task - support both submodules and repos fields
+        const inSubmodules = STATE.current_task.submodules && STATE.current_task.submodules.includes(repoName);
+        const inRepos = STATE.current_task.repos && STATE.current_task.repos.includes(repoName);
+        const isRoot = (repoPath === PROJECT_ROOT);
+        const inTask = inSubmodules || inRepos || isRoot;
+
+        // Determine the field name for error messages
+        const fieldName = CONFIG.git_preferences.has_services ? 'repos' : 'submodules';
+        const entityName = CONFIG.git_preferences.has_services ? 'Service repo' : 'Submodule';
 
         // Scenario 1: Everything is correct - allow to proceed
         if (inTask && branchCorrect) {
             // Allow
         }
-        // Scenario 2: Submodule is in task but on wrong branch
+        // Scenario 2: Repo is in task but on wrong branch
         else if (inTask && !branchCorrect) {
-            console.error(`[Branch Mismatch] Submodule '${submoduleName}' is part of this task but is on branch '${currentBranch}' instead of '${expectedBranch}'.`);
+            console.error(`[Branch Mismatch] ${entityName} '${repoName}' is part of this task but is on branch '${currentBranch}' instead of '${expectedBranch}'.`);
             console.error(`Please run: cd ${path.relative(PROJECT_ROOT, repoPath)} && git checkout ${expectedBranch}`);
             process.exit(2);
         }
-        // Scenario 3: Submodule not in task but already on correct branch
+        // Scenario 3: Repo not in task but already on correct branch
         else if (!inTask && branchCorrect) {
-            console.error(`[Submodule Not in Task] Submodule '${submoduleName}' is on the correct branch '${expectedBranch}' but is not listed in the task file.`);
-            console.error(`Please update the task file to include '${submoduleName}' in the submodules list.`);
+            console.error(`[${entityName} Not in Task] ${entityName} '${repoName}' is on the correct branch '${expectedBranch}' but is not listed in the task file.`);
+            console.error(`Please update the task file to include '${repoName}' in the ${fieldName} list.`);
             process.exit(2);
         }
-        // Scenario 4: Submodule not in task AND on wrong branch
+        // Scenario 4: Repo not in task AND on wrong branch
         else {
-            console.error(`[Submodule Not in Task + Wrong Branch] Submodule '${submoduleName}' has two issues:`);
-            console.error(`  1. Not listed in the task file's submodules`);
+            console.error(`[${entityName} Not in Task + Wrong Branch] ${entityName} '${repoName}' has two issues:`);
+            console.error(`  1. Not listed in the task file's ${fieldName}`);
             console.error(`  2. On branch '${currentBranch}' instead of '${expectedBranch}'`);
             console.error(`To fix: cd ${path.relative(PROJECT_ROOT, repoPath)} && git checkout -b ${expectedBranch}`);
-            console.error(`Then update the task file to include '${submoduleName}' in the submodules list.`);
+            console.error(`Then update the task file to include '${repoName}' in the ${fieldName} list.`);
             process.exit(2);
         }
     } catch (error) {

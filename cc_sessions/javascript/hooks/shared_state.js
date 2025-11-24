@@ -216,6 +216,8 @@ class GitPreferences {
         this.auto_merge = data.auto_merge || false;
         this.auto_push = data.auto_push || false;
         this.has_submodules = data.has_submodules || false;
+        this.has_services = data.has_services || false;
+        this.services_root = data.services_root || '..';
     }
 }
 
@@ -394,6 +396,7 @@ class TaskState {
         this.updated = data.updated || null;
         this.dependencies = data.dependencies || null;
         this.submodules = data.submodules || null;
+        this.repos = data.repos || null;
     }
 
     get filePath() {
@@ -435,6 +438,9 @@ class TaskState {
             if (cleanKey === 'submodules' || cleanKey === 'modules') {
                 const cleanValue = value.replace(/[\[\]]/g, '');
                 data.submodules = cleanValue.split(',').map(s => s.trim()).filter(s => s);
+            } else if (cleanKey === 'repos') {
+                const cleanValue = value.replace(/[\[\]]/g, '');
+                data.repos = cleanValue.split(',').map(s => s.trim()).filter(s => s);
             } else if (cleanKey === 'task') {
                 // Handle legacy "task:" field by mapping to "name"
                 data.name = value || null;
@@ -466,6 +472,7 @@ class TaskState {
         this.started = null;
         this.updated = null;
         this.submodules = null;
+        this.repos = null;
     }
 }
 

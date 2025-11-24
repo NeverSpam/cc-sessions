@@ -1,0 +1,3 @@
+- Check all service repos in the task's `repos` list are on the correct branch
+- Pull any updates from origin for each affected repo
+- If branches are out of sync, prompt user before proceeding
